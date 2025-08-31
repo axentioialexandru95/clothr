@@ -1,8 +1,9 @@
-import styles from '@assets/styles/index.css?inline';
-import createShadowRoot from '@utils/createShadowRoot';
+import { createRoot } from 'react-dom/client';
 
 import Popup from './Popup';
 
-const root = createShadowRoot(styles);
-
-root.render(<Popup />);
+const container = document.getElementById('my-ext-popup-page');
+if (container) {
+  const root = createRoot(container);
+  root.render(<Popup />);
+}

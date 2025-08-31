@@ -1,7 +1,7 @@
 {
-  "name": "chrome-ext-starter",
-  "displayName": "Chrome Extension Starter",
-  "description": "Get started with building your dream Chrome extension effortlessly! Our starter kit combines the power of cutting-edge technologies like Vite, TypeScript, React, CRX, Tailwind CSS, and DaisyUI, making extension development a breeze.",
+  "name": "clothr",
+  "displayName": "Clothr",
+  "description": "Clothr will help you see yourself in the clothes from any shop you want before purchase.",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -14,6 +14,8 @@
     "prepare": "husky install"
   },
   "dependencies": {
+    "@google/genai": "^1.16.0",
+    "html2canvas": "^1.4.1",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
@@ -28,8 +30,8 @@
     "@types/node": "^20.12.2",
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",
-    "@typescript-eslint/eslint-plugin": "^7.2.0",
-    "@typescript-eslint/parser": "^7.2.0",
+    "@typescript-eslint/eslint-plugin": "^7.4.0",
+    "@typescript-eslint/parser": "^7.4.0",
     "@vitejs/plugin-react": "^4.5.1",
     "autoprefixer": "^10.4.19",
     "daisyui": "^5.0.46",

@@ -9,6 +9,20 @@ export default function createShadowRoot(styles: string) {
   // Create a container element to hold the shadow root
   const container = document.createElement('div');
 
+  // Add identifier to prevent duplicates
+  container.setAttribute('data-clothr-root', 'true');
+
+  // Style the container to ensure proper positioning
+  container.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 2147483640;
+  `;
+
   // Attach a shadow root to the container element
   const shadow = container.attachShadow({ mode: 'open' });
 

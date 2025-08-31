@@ -1,363 +1,867 @@
-/* eslint-disable react/self-closing-comp */
-/* eslint-disable jsx-a11y/control-has-associated-label */
-/* eslint-disable react/button-has-type */
-/* eslint-disable jsx-a11y/no-noninteractive-tabindex */
-/* eslint-disable jsx-a11y/anchor-is-valid */
-/* eslint-disable jsx-a11y/alt-text */
-/* eslint-disable jsx-a11y/label-has-associated-control */
-import { JSX } from 'react';
+import React, { JSX, useCallback, useEffect, useState } from 'react';
+
+import ClothingSelection from './components/ClothingSelection';
+import DrawerHeader from './components/DrawerHeader';
+import FloatingButton from './components/FloatingButton';
+import ImageUpload from './components/ImageUpload';
+import TryOnButton from './components/TryOnButton';
+import TryOnResult from './components/TryOnResult';
+
+interface ClothrState {
+  isSelectionMode: boolean;
+  userImage: string | null;
+  selectedClothingImage: string | null;
+  generatedImage: string | null;
+  isProcessing: boolean;
+  error: string | null;
+}
 
 export default function Content(): JSX.Element {
+  const [state, setState] = useState<ClothrState>({
+    isSelectionMode: false,
+    userImage: null,
+    selectedClothingImage: null,
+    generatedImage: null,
+    isProcessing: false,
+    error: null,
+  });
+
+  const [showModal, setShowModal] = useState(false);
+
+  // Load saved user image on mount
+  useEffect(() => {
+    const savedImage = localStorage.getItem('clothr-user-image');
+    if (savedImage) {
+      setState((prev) => ({
+        ...prev,
+        userImage: savedImage,
+      }));
+    }
+  }, []);
+
+  // Cleanup selection mode on component unmount and mount
+  useEffect(() => {
+    // Clean up immediately on mount in case there are leftovers
+    const cleanupSelectionMode = () => {
+      // Remove instruction overlays
+      const instructions = document.querySelectorAll(
+        'div[style*="🎯 Click on any image"]'
+      );
+      instructions.forEach((el) => el.remove());
+
+      // Remove blue outline accessibility message
+      const accessibilityMessages = document.querySelectorAll(
+        'div[style*="Ajustarea cititirorului"]'
+      );
+      accessibilityMessages.forEach((el) => el.remove());
+
+      // Remove any blue overlays or selection boxes
+      const overlays = document.querySelectorAll(
+        'div[style*="position: fixed"][style*="blue"], div[style*="3b82f6"]'
+      );
+      overlays.forEach((el) => el.remove());
+
+      // Remove outlines from all images
+      const images = document.querySelectorAll('img');
+      images.forEach((img) => {
+        img.style.outline = '';
+        img.style.boxShadow = '';
+        img.style.cursor = '';
+      });
+
+      // Remove all event listeners that might be lingering
+      const newImages = document.querySelectorAll('img');
+      newImages.forEach((img) => {
+        img.style.outline = '';
+        img.style.boxShadow = '';
+        img.style.cursor = '';
+        // Clone and replace to remove all event listeners
+        const newImg = img.cloneNode(true) as HTMLImageElement;
+        img.parentNode?.replaceChild(newImg, img);
+      });
+    };
+
+    // Clean up on mount
+    cleanupSelectionMode();
+
+    // Return cleanup function for unmount
+    return cleanupSelectionMode;
+  }, []);
+
+  // Debug logging
+
+  console.log('🔥 Clothr Content Script Loaded!');
+
+  const handleImageUpload = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const imageData = e.target?.result as string;
+          // Save to localStorage
+          localStorage.setItem('clothr-user-image', imageData);
+          setState((prev) => ({
+            ...prev,
+            userImage: imageData,
+          }));
+        };
+        reader.readAsDataURL(file);
+      }
+    },
+    []
+  );
+
+  const handleFileDrop = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const imageData = e.target?.result as string;
+      // Save to localStorage
+      localStorage.setItem('clothr-user-image', imageData);
+      setState((prev) => ({
+        ...prev,
+        userImage: imageData,
+      }));
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const { files } = e.dataTransfer;
+      if (files && files[0] && files[0].type.startsWith('image/')) {
+        handleFileDrop(files[0]);
+      }
+    },
+    [handleFileDrop]
+  );
+
+  const enableSelectionMode = useCallback(() => {
+    setState((prevState) => ({ ...prevState, isSelectionMode: true }));
+
+    // Create instructions
+    const instructions = document.createElement('div');
+    instructions.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      z-index: 2147483647;
+      border: 2px solid #3b82f6;
+      box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+    `;
+    instructions.innerHTML =
+      '🎯 Click on any image on the page • Press ESC to cancel';
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      if (target.tagName === 'IMG') {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const img = target as HTMLImageElement;
+        setState((prev) => ({
+          ...prev,
+          selectedClothingImage: img.src,
+          isSelectionMode: false,
+        }));
+        cleanup();
+      }
+    };
+
+    const handleMouseOver = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      if (target.tagName === 'IMG') {
+        target.style.outline = '3px solid #3b82f6';
+        target.style.boxShadow = '0 0 15px rgba(59, 130, 246, 0.6)';
+        target.style.cursor = 'pointer';
+      }
+    };
+
+    const handleMouseOut = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      if (target.tagName === 'IMG') {
+        target.style.outline = '';
+        target.style.boxShadow = '';
+        target.style.cursor = '';
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setState((prev) => ({ ...prev, isSelectionMode: false }));
+        cleanup();
+      }
+    };
+
+    const cleanup = () => {
+      // Remove instructions overlay
+      if (instructions && instructions.parentNode) {
+        instructions.remove();
+      }
+
+      // Remove all event listeners
+      document.removeEventListener('click', handleClick, true);
+      document.removeEventListener('mouseover', handleMouseOver);
+      document.removeEventListener('mouseout', handleMouseOut);
+      document.removeEventListener('keydown', handleKeyDown);
+
+      // Clear all image outlines immediately
+      const allImages = document.querySelectorAll('img');
+      allImages.forEach((img) => {
+        (img as HTMLImageElement).style.outline = '';
+        (img as HTMLImageElement).style.boxShadow = '';
+        (img as HTMLImageElement).style.cursor = '';
+      });
+
+      // Remove any accessibility overlays that might have been created
+      const accessibilityMessages = document.querySelectorAll(
+        'div[style*="Ajustarea cititirorului"], div[style*="position: fixed"][style*="blue"]'
+      );
+      accessibilityMessages.forEach((el) => el.remove());
+    };
+
+    document.body.appendChild(instructions);
+    document.addEventListener('click', handleClick, true);
+    document.addEventListener('mouseover', handleMouseOver);
+    document.addEventListener('mouseout', handleMouseOut);
+    document.addEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Helper function to convert URL to base64
+  const convertUrlToBase64 = async (url: string): Promise<string> => {
+    try {
+      console.log('🌐 Fetching image from URL:', url);
+      const response = await fetch(url);
+
+      if (!response.ok) {
+        throw new Error(
+          `Failed to fetch image: ${response.status} ${response.statusText}`
+        );
+      }
+
+      const blob = await response.blob();
+
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          if (!dataUrl) {
+            reject(new Error('Failed to convert image to base64'));
+            return;
+          }
+          console.log('✅ Successfully converted URL to base64');
+          resolve(dataUrl);
+        };
+        reader.onerror = () => {
+          reject(new Error('Failed to read image blob'));
+        };
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('❌ Error converting URL to base64:', error);
+      throw new Error(
+        `Failed to load image from URL: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+    }
+  };
+
+  const generateTryOn = async () => {
+    if (!state.userImage || !state.selectedClothingImage) {
+      console.error('❌ Missing required images:', {
+        hasUserImage: !!state.userImage,
+        hasClothingImage: !!state.selectedClothingImage,
+      });
+      setState((prev) => ({
+        ...prev,
+        error:
+          'Please ensure you have uploaded your photo and selected clothing.',
+      }));
+      return;
+    }
+
+    console.log('🚀 Starting try-on generation...');
+    console.log('📊 State check:', {
+      hasUserImage: !!state.userImage,
+      hasClothingImage: !!state.selectedClothingImage,
+      userImageLength: state.userImage?.length,
+      clothingImageUrl: state.selectedClothingImage,
+    });
+
+    setState((prev) => ({ ...prev, isProcessing: true, error: null }));
+
+    try {
+      // Process clothing image if it's a URL
+      let clothingImageData = state.selectedClothingImage;
+      if (state.selectedClothingImage.startsWith('http')) {
+        console.log('🔄 Converting clothing image URL to base64...');
+        clothingImageData = await convertUrlToBase64(
+          state.selectedClothingImage
+        );
+      }
+
+      console.log('📤 Sending message to background script...');
+      const response = await chrome.runtime.sendMessage({
+        action: 'generateTryOn',
+        userImage: state.userImage,
+        clothingImage: clothingImageData,
+      });
+
+      console.log('📥 Response from background:', response);
+
+      if (!response) {
+        console.error('❌ No response from background script');
+        setState((prev) => ({
+          ...prev,
+          error:
+            'Extension error: No response from background script. Please check if the extension is properly installed.',
+        }));
+        setState((prev) => ({ ...prev, isProcessing: false }));
+        return;
+      }
+
+      if (response.error) {
+        console.error('❌ API Error:', response.error);
+
+        // Show user-friendly error message
+        const errorMessage = response.error;
+        let displayMessage = errorMessage;
+
+        // Format specific common errors
+        if (
+          errorMessage.includes('quota exceeded') ||
+          errorMessage.includes('Rate limit exceeded')
+        ) {
+          displayMessage = `⚠️ ${errorMessage}\n\n💡 Tip: The Gemini API has usage limits. Try again in a few minutes.`;
+        } else if (errorMessage.includes('Invalid API key')) {
+          displayMessage = `🔑 ${errorMessage}\n\n💡 Tip: Go to extension settings to update your API key.`;
+        } else if (errorMessage.includes('Model not found')) {
+          displayMessage = `🤖 ${errorMessage}\n\n💡 Tip: The image generation model might be temporarily unavailable.`;
+        } else if (
+          errorMessage.includes('too large') ||
+          errorMessage.includes('compress')
+        ) {
+          displayMessage = `📸 ${errorMessage}\n\n💡 Tip: Try using smaller or lower resolution images.`;
+        }
+
+        setState((prev) => ({ ...prev, error: displayMessage }));
+        setState((prev) => ({ ...prev, isProcessing: false }));
+        return;
+      }
+
+      if (response.imageUrl) {
+        console.log('✅ Try-on generated successfully');
+        setState((prev) => ({
+          ...prev,
+          generatedImage: response.imageUrl,
+          isProcessing: false,
+        }));
+      } else {
+        console.error('❌ No image URL in response');
+        setState((prev) => ({
+          ...prev,
+          error: 'No image was generated. Please try again.',
+        }));
+        setState((prev) => ({ ...prev, isProcessing: false }));
+      }
+    } catch (error) {
+      console.error('❌ Error generating try-on:', error);
+      if (error instanceof Error) {
+        if (error.message.includes('Could not establish connection')) {
+          setState((prev) => ({
+            ...prev,
+            error:
+              'Extension error: Could not connect to background script. Please reload the extension.',
+          }));
+        } else {
+          setState((prev) => ({ ...prev, error: `Error: ${error.message}` }));
+        }
+      } else {
+        setState((prev) => ({
+          ...prev,
+          error: 'Unknown error occurred. Please try again.',
+        }));
+      }
+      setState((prev) => ({ ...prev, isProcessing: false }));
+    }
+  };
+
+  const handleCloseModal = useCallback(() => {
+    setShowModal(false);
+  }, []);
+
+  // Show on all sites for testing
+  const isShoppingSite = () => true; // Always show for testing
+
+  if (!isShoppingSite()) {
+    return <div />;
+  }
+
   return (
-    <div id='my-ext' className='container' data-theme='light'>
-      <div className='flex flex-col gap-6 p-8'>
-        <div className='mx-auto w-72 rounded-xl bg-white p-4 shadow-lg dark:bg-gray-800'>
-          <p className='text-gray-600 dark:text-white'>
-            <span className='text-lg font-bold text-indigo-500'>“</span>
-            To get social media testimonials like these, keep your customers
-            engaged with your social media accounts by posting regularly
-            yourself
-            <span className='text-lg font-bold text-indigo-500'>”</span>
-          </p>
-          <div className='mt-4 flex items-center'>
-            <a href='google.com' className='relative block'>
-              <img
-                alt='profil'
-                src='https://www.tailwind-kit.com/images/person/1.jpg'
-                className='mx-auto h-10 w-10 rounded-full object-cover '
-              />
-            </a>
-            <div className='ml-2 flex flex-col justify-between'>
-              <span className='text-sm font-semibold text-indigo-500'>
-                Jean Miguel
-              </span>
-              <span className='flex items-center text-xs dark:text-gray-400'>
-                User of Tail-Kit
-                <img src='/icons/rocket.svg' className='ml-2 h-4 w-4' alt='' />
-              </span>
-            </div>
-          </div>
-        </div>
+    <>
+      {!showModal && (
+        <FloatingButton
+          onClick={() => {
+            console.log('🎯 Clothr button clicked!');
+            setShowModal(true);
+          }}
+        />
+      )}
 
-        <div className='flex gap-2'>
-          <button type='button' className='btn btn-outline'>
-            Default
-          </button>
-          <button type='button' className='btn btn-primary btn-outline'>
-            Primary
-          </button>
-          <button type='button' className='btn btn-secondary btn-outline'>
-            Secondary
-          </button>
-          <button type='button' className='btn btn-accent btn-outline'>
-            Accent
-          </button>
-          <button type='button' className='btn btn-neutral'>
-            Neutral
-          </button>
-          <button type='button' className='btn btn-primary'>
-            Primary
-          </button>
-          <button type='button' className='btn'>
-            Button
-          </button>
-          <button type='button' className='btn btn-secondary'>
-            Secondary
-          </button>
-          <button type='button' className='btn btn-accent'>
-            Accent
-          </button>
-          <button type='button' className='btn btn-ghost'>
-            Ghost
-          </button>
-          <button type='button' className='btn btn-link'>
-            Link
-          </button>
-        </div>
-
-        <div className='flex gap-2'>
-          <label className='input-bordered input flex items-center gap-2'>
-            <input type='text' className='grow' placeholder='Search' />
-            <svg
-              xmlns='http://www.w3.org/2000/svg'
-              viewBox='0 0 16 16'
-              fill='currentColor'
-              className='h-4 w-4 opacity-70'
-            >
-              <path
-                fillRule='evenodd'
-                d='M9.965 11.026a5 5 0 1 1 1.06-1.06l2.755 2.754a.75.75 0 1 1-1.06 1.06l-2.755-2.754ZM10.5 7a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z'
-                clipRule='evenodd'
-              />
-            </svg>
-          </label>
-          <label className='input-bordered input flex items-center gap-2'>
-            <svg
-              xmlns='http://www.w3.org/2000/svg'
-              viewBox='0 0 16 16'
-              fill='currentColor'
-              className='h-4 w-4 opacity-70'
-            >
-              <path d='M2.5 3A1.5 1.5 0 0 0 1 4.5v.793c.026.009.051.02.076.032L7.674 8.51c.206.1.446.1.652 0l6.598-3.185A.755.755 0 0 1 15 5.293V4.5A1.5 1.5 0 0 0 13.5 3h-11Z' />
-              <path d='M15 6.954 8.978 9.86a2.25 2.25 0 0 1-1.956 0L1 6.954V11.5A1.5 1.5 0 0 0 2.5 13h11a1.5 1.5 0 0 0 1.5-1.5V6.954Z' />
-            </svg>
-            <input type='text' className='grow' placeholder='Email' />
-          </label>
-          <label className='input-bordered input flex items-center gap-2'>
-            <svg
-              xmlns='http://www.w3.org/2000/svg'
-              viewBox='0 0 16 16'
-              fill='currentColor'
-              className='h-4 w-4 opacity-70'
-            >
-              <path d='M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM12.735 14c.618 0 1.093-.561.872-1.139a6.002 6.002 0 0 0-11.215 0c-.22.578.254 1.139.872 1.139h9.47Z' />
-            </svg>
-            <input type='text' className='grow' placeholder='Username' />
-          </label>
-          <label className='input-bordered input flex items-center gap-2'>
-            <svg
-              xmlns='http://www.w3.org/2000/svg'
-              viewBox='0 0 16 16'
-              fill='currentColor'
-              className='h-4 w-4 opacity-70'
-            >
-              <path
-                fillRule='evenodd'
-                d='M14 6a4 4 0 0 1-4.899 3.899l-1.955 1.955a.5.5 0 0 1-.353.146H5v1.5a.5.5 0 0 1-.5.5h-2a.5.5 0 0 1-.5-.5v-2.293a.5.5 0 0 1 .146-.353l3.955-3.955A4 4 0 1 1 14 6Zm-4-2a.75.75 0 0 0 0 1.5.5.5 0 0 1 .5.5.75.75 0 0 0 1.5 0 2 2 0 0 0-2-2Z'
-                clipRule='evenodd'
-              />
-            </svg>
-            <input type='password' className='grow' value='password' />
-          </label>
-        </div>
-
-        <div className='mt-10 flex gap-2'>
+      {showModal && (
+        <>
+          {/* Right Drawer */}
           <div
-            className='tooltip tooltip-open tooltip-primary'
-            data-tip='primary'
+            style={{
+              position: 'fixed',
+              top: 0,
+              right: 0,
+              width: '400px',
+              height: '100vh',
+              background: '#ffffff',
+              boxShadow: '-4px 0 20px rgba(0, 0, 0, 0.1)',
+              zIndex: 2147483646,
+              overflowY: 'auto',
+              animation: 'slideInRight 0.2s ease-out',
+              pointerEvents: 'auto',
+              fontFamily:
+                '"Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+            }}
           >
-            <button type='button' className='btn btn-primary'>
-              primary
-            </button>
-          </div>
-        </div>
+            <style>
+              {`
+                @keyframes slideInRight {
+                  from { transform: translateX(100%); }
+                  to { transform: translateX(0); }
+                }
+              `}
+            </style>
 
-        <div className='mt-8'>
-          <div className='carousel w-full'>
-            <div id='item1' className='carousel-item w-full'>
-              <img
-                src='https://img.daisyui.com/images/stock/photo-1625726411847-8cbb60cc71e6.webp'
-                className='w-full'
-              />
-            </div>
-            <div id='item2' className='carousel-item w-full'>
-              <img
-                src='https://img.daisyui.com/images/stock/photo-1609621838510-5ad474b7d25d.webp'
-                className='w-full'
-              />
-            </div>
-            <div id='item3' className='carousel-item w-full'>
-              <img
-                src='https://img.daisyui.com/images/stock/photo-1414694762283-acccc27bca85.webp'
-                className='w-full'
-              />
-            </div>
-            <div id='item4' className='carousel-item w-full'>
-              <img
-                src='https://img.daisyui.com/images/stock/photo-1665553365602-b2fb8e5d1707.webp'
-                className='w-full'
-              />
-            </div>
-          </div>
-          <div className='flex w-full justify-center gap-2 py-2'>
-            <a href='#item1' className='btn btn-xs'>
-              1
-            </a>
-            <a href='#item2' className='btn btn-xs'>
-              2
-            </a>
-            <a href='#item3' className='btn btn-xs'>
-              3
-            </a>
-            <a href='#item4' className='btn btn-xs'>
-              4
-            </a>
-          </div>
-        </div>
+            <div
+              style={{
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <DrawerHeader onClose={handleCloseModal} />
 
-        <div className='mt-8'>
-          <div className='overflow-x-auto'>
-            <table className='table'>
-              {/* head */}
-              <thead>
-                <tr>
-                  <th>
-                    <label>
-                      <input type='checkbox' className='checkbox' />
-                    </label>
-                  </th>
-                  <th>Name</th>
-                  <th>Job</th>
-                  <th>Favorite Color</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {/* row 1 */}
-                <tr>
-                  <th>
-                    <label>
-                      <input type='checkbox' className='checkbox' />
-                    </label>
-                  </th>
-                  <td>
-                    <div className='flex items-center gap-3'>
-                      <div className='avatar'>
-                        <div className='mask mask-squircle h-12 w-12'>
-                          <img
-                            src='https://img.daisyui.com/images/profile/demo/2@94.webp'
-                            alt='Avatar Tailwind CSS Component'
-                          />
+              {/* Main Content - Connected Steps */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0px',
+                  position: 'relative',
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  backdropFilter: 'blur(10px)',
+                  borderRadius: '16px',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  flex: '0 0 auto',
+                  marginBottom: '16px',
+                }}
+              >
+                {/* Step 1 - User Photo */}
+                <div style={{ position: 'relative' }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '20px',
+                      top: '-8px',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: state.userImage
+                        ? 'linear-gradient(135deg, #10b981, #059669)'
+                        : '#d1d5db',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      zIndex: 10,
+                      border: '2px solid white',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                    }}
+                  >
+                    1
+                  </div>
+                  <ImageUpload
+                    userImage={state.userImage}
+                    onImageUpload={handleImageUpload}
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                  />
+                </div>
+
+                {/* Step 2 - Clothing Selection */}
+                <div style={{ position: 'relative' }}>
+                  {/* Separator Line */}
+                  <div
+                    style={{
+                      height: '1px',
+                      background:
+                        'linear-gradient(to right, transparent, #e5e7eb, transparent)',
+                      margin: '0 24px',
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '20px',
+                      top: '-12px',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: state.selectedClothingImage
+                        ? 'linear-gradient(135deg, #10b981, #059669)'
+                        : state.userImage
+                          ? 'linear-gradient(135deg, #ec4899, #be185d)'
+                          : '#d1d5db',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      zIndex: 10,
+                      border: '2px solid white',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                    }}
+                  >
+                    2
+                  </div>
+                  <ClothingSelection
+                    isSelectionMode={state.isSelectionMode}
+                    selectedClothingImage={state.selectedClothingImage}
+                    onEnableSelectionMode={enableSelectionMode}
+                  />
+                </div>
+
+                {/* Step 3 - Try On */}
+                <div
+                  style={{
+                    position: 'relative',
+                    opacity:
+                      state.userImage && state.selectedClothingImage ? 1 : 0.4,
+                  }}
+                >
+                  {/* Separator Line */}
+                  <div
+                    style={{
+                      height: '1px',
+                      background:
+                        'linear-gradient(to right, transparent, #e5e7eb, transparent)',
+                      margin: '0 24px',
+                    }}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: '20px',
+                      top: '-12px',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: state.generatedImage
+                        ? 'linear-gradient(135deg, #10b981, #059669)'
+                        : state.userImage && state.selectedClothingImage
+                          ? 'linear-gradient(135deg, #f59e0b, #d97706)'
+                          : '#d1d5db',
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      zIndex: 10,
+                      border: '2px solid white',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                    }}
+                  >
+                    3
+                  </div>
+                  <TryOnButton
+                    isProcessing={state.isProcessing}
+                    onClick={generateTryOn}
+                  />
+                  {/* Connection Line */}
+                  {state.generatedImage && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: '31px',
+                        bottom: '0px',
+                        width: '2px',
+                        height: '2px',
+                        background:
+                          'linear-gradient(to bottom, #f59e0b, #10b981)',
+                        zIndex: 5,
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* Loading State */}
+                {state.isProcessing && !state.generatedImage && (
+                  <div style={{ position: 'relative', marginTop: '0px' }}>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: '20px',
+                        top: '-8px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        zIndex: 10,
+                        border: '2px solid white',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                        animation: 'pulse 2s infinite',
+                      }}
+                    >
+                      <span style={{ animation: 'spin 2s linear infinite' }}>
+                        🔄
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        backdropFilter: 'blur(10px)',
+                        borderRadius: '16px',
+                        padding: '40px 24px',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div style={{ marginBottom: '24px' }}>
+                        <div
+                          style={{
+                            fontSize: '48px',
+                            marginBottom: '16px',
+                            animation: 'spin 3s linear infinite',
+                          }}
+                        >
+                          ✨
                         </div>
+                        <h3
+                          style={{
+                            fontSize: '18px',
+                            fontWeight: '600',
+                            color: '#1f2937',
+                            margin: '0 0 8px 0',
+                          }}
+                        >
+                          Creating Your Try-On
+                        </h3>
+                        <p
+                          style={{
+                            fontSize: '14px',
+                            color: '#6b7280',
+                            margin: 0,
+                            lineHeight: '1.5',
+                          }}
+                        >
+                          Our AI is working its magic to show you how the
+                          clothing will look on you. This may take a few
+                          moments...
+                        </p>
                       </div>
-                      <div>
-                        <div className='font-bold'>Hart Hagerty</div>
-                        <div className='text-sm opacity-50'>United States</div>
+
+                      {/* Progress dots */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          marginTop: '20px',
+                        }}
+                      >
+                        {[0, 1, 2].map((i) => (
+                          <div
+                            key={i}
+                            style={{
+                              width: '8px',
+                              height: '8px',
+                              borderRadius: '50%',
+                              background: '#f59e0b',
+                              animation: `bounce 1.4s infinite both`,
+                              animationDelay: `${i * 0.16}s`,
+                            }}
+                          />
+                        ))}
                       </div>
                     </div>
-                  </td>
-                  <td>
-                    Zemlak, Daniel and Leannon
-                    <br />
-                    <span className='badge badge-ghost badge-sm'>
-                      Desktop Support Technician
-                    </span>
-                  </td>
-                  <td>Purple</td>
-                  <th>
-                    <button className='btn btn-ghost btn-xs'>details</button>
-                  </th>
-                </tr>
-                {/* row 2 */}
-                <tr>
-                  <th>
-                    <label>
-                      <input type='checkbox' className='checkbox' />
-                    </label>
-                  </th>
-                  <td>
-                    <div className='flex items-center gap-3'>
-                      <div className='avatar'>
-                        <div className='mask mask-squircle h-12 w-12'>
-                          <img
-                            src='https://img.daisyui.com/images/profile/demo/3@94.webp'
-                            alt='Avatar Tailwind CSS Component'
-                          />
-                        </div>
+                    <style>
+                      {`
+                        @keyframes spin {
+                          from { transform: rotate(0deg); }
+                          to { transform: rotate(360deg); }
+                        }
+                        @keyframes pulse {
+                          0%, 100% { opacity: 1; }
+                          50% { opacity: 0.5; }
+                        }
+                        @keyframes bounce {
+                          0%, 80%, 100% {
+                            transform: scale(0);
+                            opacity: 0.5;
+                          }
+                          40% {
+                            transform: scale(1);
+                            opacity: 1;
+                          }
+                        }
+                      `}
+                    </style>
+                  </div>
+                )}
+
+                {/* Result */}
+                {state.generatedImage && (
+                  <div style={{ position: 'relative', marginTop: '0px' }}>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: '20px',
+                        top: '-8px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #10b981, #059669)',
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        zIndex: 10,
+                        border: '2px solid white',
+                        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                      }}
+                    >
+                      ✓
+                    </div>
+                    <TryOnResult
+                      generatedImage={state.generatedImage}
+                      onTryAgain={() => {
+                        setState((prev) => ({
+                          ...prev,
+                          generatedImage: null,
+                          selectedClothingImage: null,
+                          isProcessing: false,
+                        }));
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Error Display */}
+                {state.error && (
+                  <div
+                    style={{
+                      background: 'rgba(254, 242, 242, 0.95)',
+                      border: '1px solid rgba(248, 113, 113, 0.3)',
+                      borderRadius: '12px',
+                      padding: '16px',
+                      marginTop: '16px',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '12px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '18px',
+                        color: '#dc2626',
+                        lineHeight: 1,
+                      }}
+                    >
+                      ⚠️
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontSize: '14px',
+                          color: '#dc2626',
+                          fontWeight: '500',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        Error
                       </div>
-                      <div>
-                        <div className='font-bold'>Brice Swyre</div>
-                        <div className='text-sm opacity-50'>China</div>
+                      <div
+                        style={{
+                          fontSize: '13px',
+                          color: '#7f1d1d',
+                          lineHeight: '1.4',
+                          whiteSpace: 'pre-line',
+                        }}
+                      >
+                        {state.error}
                       </div>
                     </div>
-                  </td>
-                  <td>
-                    Carroll Group
-                    <br />
-                    <span className='badge badge-ghost badge-sm'>
-                      Tax Accountant
-                    </span>
-                  </td>
-                  <td>Red</td>
-                  <th>
-                    <button className='btn btn-ghost btn-xs'>details</button>
-                  </th>
-                </tr>
-                {/* row 3 */}
-                <tr>
-                  <th>
-                    <label>
-                      <input type='checkbox' className='checkbox' />
-                    </label>
-                  </th>
-                  <td>
-                    <div className='flex items-center gap-3'>
-                      <div className='avatar'>
-                        <div className='mask mask-squircle h-12 w-12'>
-                          <img
-                            src='https://img.daisyui.com/images/profile/demo/4@94.webp'
-                            alt='Avatar Tailwind CSS Component'
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <div className='font-bold'>Marjy Ferencz</div>
-                        <div className='text-sm opacity-50'>Russia</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    Rowe-Schoen
-                    <br />
-                    <span className='badge badge-ghost badge-sm'>
-                      Office Assistant I
-                    </span>
-                  </td>
-                  <td>Crimson</td>
-                  <th>
-                    <button className='btn btn-ghost btn-xs'>details</button>
-                  </th>
-                </tr>
-                {/* row 4 */}
-                <tr>
-                  <th>
-                    <label>
-                      <input type='checkbox' className='checkbox' />
-                    </label>
-                  </th>
-                  <td>
-                    <div className='flex items-center gap-3'>
-                      <div className='avatar'>
-                        <div className='mask mask-squircle h-12 w-12'>
-                          <img
-                            src='https://img.daisyui.com/images/profile/demo/5@94.webp'
-                            alt='Avatar Tailwind CSS Component'
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <div className='font-bold'>Yancy Tear</div>
-                        <div className='text-sm opacity-50'>Brazil</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    Wyman-Ledner
-                    <br />
-                    <span className='badge badge-ghost badge-sm'>
-                      Community Outreach Specialist
-                    </span>
-                  </td>
-                  <td>Indigo</td>
-                  <th>
-                    <button className='btn btn-ghost btn-xs'>details</button>
-                  </th>
-                </tr>
-              </tbody>
-              {/* foot */}
-              <tfoot>
-                <tr>
-                  <th></th>
-                  <th>Name</th>
-                  <th>Job</th>
-                  <th>Favorite Color</th>
-                  <th></th>
-                </tr>
-              </tfoot>
-            </table>
+                    <button
+                      type='button'
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        fontSize: '16px',
+                        color: '#dc2626',
+                        cursor: 'pointer',
+                        padding: '0',
+                        lineHeight: 1,
+                      }}
+                      onClick={() =>
+                        setState((prev) => ({ ...prev, error: null }))
+                      }
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    </>
   );
 }
